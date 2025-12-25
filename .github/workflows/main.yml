@@ -39,7 +39,7 @@ jobs:
             echo "version_changed=false" >> "$GITHUB_OUTPUT"
           fi
   build:
-    name: Build libcurl-transport
+    name: Build bare-transport
     runs-on: ubuntu-latest
 
     steps:
