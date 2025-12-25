@@ -1,4 +1,4 @@
-import { BareError } from "./Client";
+import { BareError } from "./BareTypes";
 
 const MAX_HEADER_VALUE = 3072;
 

@@ -1,13 +1,3 @@
-export type BareMethod =
-	| "GET"
-	| "POST"
-	| "DELETE"
-	| "OPTIONS"
-	| "PUT"
-	| "PATCH"
-	| "UPDATE"
-	| string;
-
 export type BareCache =
 	| "default"
 	| "no-store"
@@ -26,23 +16,6 @@ export type BareHTTPProtocol = "blob:" | "http:" | "https:" | string;
 export type BareWSProtocol = "ws:" | "wss:" | string;
 
 export const maxRedirects = 20;
-
-export type BareHeaders = Record<string, string | string[]>;
-
-/**
- * A Response with additional properties.
- */
-export interface BareResponse extends Response {
-	rawResponse: Response;
-	rawHeaders: BareHeaders;
-}
-
-/**
- * A BareResponse with additional properties.
- */
-export interface BareResponseFetch extends BareResponse {
-	finalURL: string;
-}
 
 export interface BareMaintainer {
 	email?: string;
@@ -80,4 +53,22 @@ export interface BareManifest {
 	versions: string[];
 	language: BareLanguage;
 	memoryUsage?: number;
+}
+
+
+export interface BareErrorBody {
+	code: string;
+	id: string;
+	message?: string;
+	stack?: string;
+}
+
+export class BareError extends Error {
+	status: number;
+	body: BareErrorBody;
+	constructor(status: number, body: BareErrorBody) {
+		super(body.message || body.code);
+		this.status = status;
+		this.body = body;
+	}
 }

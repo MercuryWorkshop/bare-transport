@@ -1,9 +1,9 @@
-import type { BareHeaders } from "./BareTypes.js";
+import { RawHeaders } from "@mercuryworkshop/proxy-transports";
 
 export interface BareResponseHeaders {
+	headers: RawHeaders;
 	status: number;
 	statusText: string;
-	headers: BareHeaders;
 }
 
 export interface SocketClientToServer {
@@ -19,7 +19,7 @@ export interface SocketClientToServer {
 	/**
 	 * Headers to send to the remote. Usually Cookie, Origin, and User-Agent.
 	 */
-	headers: BareHeaders;
+	headers: Record<string, string>;
 	/**
 	 * Forwards to forward from the WebSocket handshake (eg. User-Agent)
 	 */
@@ -37,3 +37,4 @@ export interface SocketServerToClient {
 	 */
 	setCookies: string[];
 }
+

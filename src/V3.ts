@@ -1,15 +1,5 @@
-import type {
-	BareCache,
-	BareHeaders,
-	BareMethod,
-	BareResponse,
-} from "./BareTypes.js";
-import { BareError, Client, statusEmpty } from "./Client.js";
-import type {
-	ReadyStateCallback,
-	MetaCallback,
-	GetRequestHeadersCallback,
-} from "./Client.js";
+import { Client } from "./Client";
+import { BareError } from "./BareTypes";
 import type {
 	BareResponseHeaders,
 	SocketClientToServer,
@@ -19,17 +9,16 @@ import md5 from "./md5.js";
 import { WebSocketFields } from "./snapshot.js";
 import { joinHeaders, splitHeaders } from "./splitHeaderUtil.js";
 import type {
-	BareTransport,
+	ProxyTransport,
+	RawHeaders,
 	TransferrableResponse,
-} from "@mercuryworkshop/bare-mux";
+} from "@mercuryworkshop/proxy-transports";
 
-export default class ClientV3 extends Client implements BareTransport {
+export default class ClientV3 extends Client implements ProxyTransport {
 	ws: URL;
 	http: URL;
+	ready = true;
 
-	meta() {
-		return {};
-	}
 	constructor(server: URL) {
 		super(3, server);
 
@@ -42,15 +31,15 @@ export default class ClientV3 extends Client implements BareTransport {
 			this.ws.protocol = "ws:";
 		}
 	}
-	ready = true;
+
 	async init() {
 		this.ready = true;
 	}
 	connect(
 		url: URL,
 		protocols: string[],
-		requestHeaders: BareHeaders,
-		onopen: (protocol: string) => void,
+		requestHeaders: RawHeaders = [],
+		onopen: (protocol: string, extensions: string) => void,
 		onmessage: (data: Blob | ArrayBuffer | string) => void,
 		onclose: (code: number, reason: string) => void,
 		onerror: (error: string) => void
@@ -59,10 +48,9 @@ export default class ClientV3 extends Client implements BareTransport {
 		(code: number, reason: string) => void,
 	] {
 		const ws = new WebSocket(this.ws);
-
-		requestHeaders["Host"] = url.host;
-		requestHeaders["Upgrade"] = "websocket";
-		requestHeaders["Connection"] = "Upgrade";
+		requestHeaders.push(["Host", url.host])
+		requestHeaders.push(["Upgrade", "websocket"])
+		requestHeaders.push(["Connection", "Upgrade"])
 
 		const cleanup = () => {
 			ws.removeEventListener("close", closeListener);
@@ -82,12 +70,8 @@ export default class ClientV3 extends Client implements BareTransport {
 			if (message.type !== "open")
 				throw new TypeError("message was not of open type");
 
-			// onMeta({
-			// 	protocol: message.protocol,
-			// 	setCookies: message.setCookies,
-			// });
 
-			onopen(message.protocol);
+			onopen(message.protocol, "");
 
 			ws.addEventListener("message", (ev) => {
 				onmessage(ev.data);
@@ -116,7 +100,7 @@ export default class ClientV3 extends Client implements BareTransport {
 						type: "connect",
 						remote: url.toString(),
 						protocols,
-						headers: requestHeaders,
+						headers: Object.fromEntries(requestHeaders),
 						forwardHeaders: [],
 					} as unknown as SocketClientToServer)
 				);
@@ -127,11 +111,12 @@ export default class ClientV3 extends Client implements BareTransport {
 
 		return [ws.send.bind(ws), ws.close.bind(ws)];
 	}
+
 	async request(
 		remote: URL,
-		method: BareMethod,
+		method: string,
 		body: BodyInit | null,
-		headers: BareHeaders,
+		headers: RawHeaders,
 		signal: AbortSignal | undefined
 	): Promise<TransferrableResponse> {
 		const options: RequestInit = {
@@ -145,9 +130,8 @@ export default class ClientV3 extends Client implements BareTransport {
 		if (body !== undefined) {
 			options.body = body;
 		}
-
-		if ("host" in headers) headers.host = remote.host;
-		else headers.Host = remote.host;
+		
+		headers.push(["Host", remote.host])
 		options.headers = this.createBareHeaders(remote, headers);
 
 		const response = await fetch(
@@ -181,13 +165,13 @@ export default class ClientV3 extends Client implements BareTransport {
 		if (xBareStatusText !== null) result.statusText = xBareStatusText;
 
 		const xBareHeaders = responseHeaders.get("x-bare-headers");
-		if (xBareHeaders !== null) result.headers = JSON.parse(xBareHeaders);
+		if (xBareHeaders !== null) result.headers = Object.entries(JSON.parse(xBareHeaders));
 
 		return result as BareResponseHeaders;
 	}
 	createBareHeaders(
 		remote: URL,
-		bareHeaders: BareHeaders,
+		bareHeaders: RawHeaders,
 		forwardHeaders: string[] = [],
 		passHeaders: string[] = [],
 		passStatus: number[] = []
@@ -195,7 +179,7 @@ export default class ClientV3 extends Client implements BareTransport {
 		const headers = new Headers();
 
 		headers.set("x-bare-url", remote.toString());
-		headers.set("x-bare-headers", JSON.stringify(bareHeaders));
+		headers.set("x-bare-headers", JSON.stringify(Object.fromEntries(bareHeaders)));
 
 		for (const header of forwardHeaders) {
 			headers.append("x-bare-forward-headers", header);
